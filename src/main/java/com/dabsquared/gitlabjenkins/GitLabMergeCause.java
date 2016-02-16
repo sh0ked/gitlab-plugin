@@ -32,8 +32,11 @@ public class GitLabMergeCause extends SCMTrigger.SCMTriggerCause {
 
     @Override
     public String getShortDescription() {
-        return "GitLab Merge Request #" + this.mergeRequest.getObjectAttribute().getIid() + " : " + this.mergeRequest.getObjectAttribute().getSourceBranch() +
-                " => " + this.mergeRequest.getObjectAttribute().getTargetBranch();
+	Integer iid = this.mergeRequest.getObjectAttribute().getIid();
+	String sourceBranch = this.mergeRequest.getObjectAttribute().getSourceBranch();
+	String targetBranch = this.mergeRequest.getObjectAttribute().getTargetBranch();
+
+        return "GitLab Merge Request #" + iid + " : " + sourceBranch + " => " + targetBranch;
     }
 
 }

@@ -12,7 +12,7 @@ public class GitLab {
 
   public GitlabAPI instance() {
     if (api == null) {
-    	String token = GitLabPushTrigger.getDesc().getGitlabApiToken();
+        String token = GitLabPushTrigger.getDesc().getGitlabApiToken();
         String url = GitLabPushTrigger.getDesc().getGitlabHostUrl();
         boolean ignoreCertificateErrors = GitLabPushTrigger.getDesc().getIgnoreCertificateErrors();
         LOGGER.log(Level.FINE, "Connecting to Gitlab server ({0})", url);

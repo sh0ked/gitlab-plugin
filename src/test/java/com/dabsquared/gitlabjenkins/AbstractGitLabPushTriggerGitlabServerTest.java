@@ -108,6 +108,9 @@ public abstract class AbstractGitLabPushTriggerGitlabServerTest {
 		boolean ciSkip = false;
 		boolean setBuildDescription = true;
 		boolean addNoteOnMergeRequest = true;
+		boolean notesCustomize = true;
+		String successNoteOnMergeRequests = "success note";
+		String failureNoteOnMergeRequests = "failure note";
 		boolean addCiMessage = true;
 		boolean addVoteOnMergeRequest = true;
 		boolean acceptMergeRequestOnSuccess = false;
@@ -116,8 +119,9 @@ public abstract class AbstractGitLabPushTriggerGitlabServerTest {
 		String excludeBranchesSpec = null;
 		String targetBranchRegex = null;
 		GitLabPushTrigger gitLabPushTrigger = new GitLabPushTrigger(triggerOnPush, triggerOnMergeRequest,
-				triggerOpenMergeRequestOnPush, ciSkip, setBuildDescription, addNoteOnMergeRequest, addCiMessage,
-				addVoteOnMergeRequest, acceptMergeRequestOnSuccess, branchFilter, includeBranchesSpec,
+				triggerOpenMergeRequestOnPush, ciSkip, setBuildDescription, addNoteOnMergeRequest, notesCustomize, 
+				successNoteOnMergeRequests, failureNoteOnMergeRequests, addCiMessage, addVoteOnMergeRequest, 
+				acceptMergeRequestOnSuccess, branchFilter, includeBranchesSpec,
 				excludeBranchesSpec, targetBranchRegex);
 
 		return gitLabPushTrigger;

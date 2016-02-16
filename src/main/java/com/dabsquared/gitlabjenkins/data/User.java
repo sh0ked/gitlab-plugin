@@ -31,6 +31,8 @@ public class User {
     }
 
     public String getEmail() {
+        if (email == null)
+            email = "";
         return email;
     }
 
