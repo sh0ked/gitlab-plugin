@@ -74,7 +74,7 @@ public class GitLabWebHook implements UnprotectedRootAction {
     }
 
     public void getDynamic(final String projectName, final StaplerRequest req, StaplerResponse res) {
-        LOGGER.log(Level.INFO, "WebHook called with url: {0}", req.getRestOfPath());
+        LOGGER.log(Level.INFO, "WebHook called with url: {0}", req.getRequestURLWithQueryString());
         final Iterator<String> restOfPathParts = Splitter.on('/').omitEmptyStrings().split(req.getRestOfPath()).iterator();
         final Job<?, ?>[] projectHolder = new Job<?, ?>[] { null };
         ACL.impersonate(ACL.SYSTEM, new Runnable() {
@@ -332,10 +332,13 @@ public class GitLabWebHook implements UnprotectedRootAction {
 
         String objectType = json.optString("object_kind");
 
-        if(objectType != null && objectType.equals("merge_request")) {
+        if (objectType != null && objectType.equals("merge_request")) {
             this.generateMergeRequestBuild(data, project, req, rsp);
-        } else {
+        } else if (objectType != null && objectType.equals("push")) {
             this.generatePushBuild(data, project, req, rsp);
+        } else {
+            LOGGER.log(Level.INFO, "Trigger not found for webhook type: {0}", objectType);
+            return;
         }
     }
 
@@ -375,11 +378,11 @@ public class GitLabWebHook implements UnprotectedRootAction {
                 }
             }
 
-            trigger.onPost(request);
-
             if (!trigger.getTriggerOpenMergeRequestOnPush().equals("never")) {
             	// Fetch and build open merge requests with the same source branch
             	buildOpenMergeRequests(trigger, request.getProject_id(), request.getRef());
+            } else {
+                trigger.onPost(request);
             }
         } finally {
             SecurityContextHolder.getContext().setAuthentication(old);
@@ -388,7 +391,7 @@ public class GitLabWebHook implements UnprotectedRootAction {
 
 	protected void buildOpenMergeRequests(GitLabPushTrigger trigger, Integer projectId, String projectRef) {
 		try {
-			GitLab api = new GitLab();
+			GitLab api = trigger.getDesc().getGitlab();
 			List<GitlabMergeRequest> mergeRequests = api.instance().getOpenMergeRequests(projectId);
 
 			for (org.gitlab.api.models.GitlabMergeRequest mr : mergeRequests) {
@@ -406,24 +409,33 @@ public class GitLabWebHook implements UnprotectedRootAction {
                     lastCommit.setUrl(GitlabProject.URL + "/" + projectId + "/repository" + GitlabCommit.URL + "/"
                             + branch.getCommit().getId());
 
+                    String assignee = null;
+
+                    if (mr.getAssignee() != null)
+                        assignee = mr.getAssignee().getName();
+
 					LOGGER.log(Level.FINE,
-							"Generating new merge trigger from "
-									+ mr.toString() + "\n source: "
-									+ mr.getSourceBranch() + "\n target: "
-									+ mr.getTargetBranch() + "\n state: "
-									+ mr.getState() + "\n assign: "
-									+ mr.getAssignee().getName() + "\n author: "
-									+ mr.getAuthor().getName() + "\n id: "
-									+ mr.getId() + "\n iid: "
-                                    + mr.getIid() + "\n last commit: "
-                                    + lastCommit.getId() + "\n\n");
-					GitLabMergeRequest newReq = new GitLabMergeRequest();
+						"Generating new merge trigger from " + mr.toString() 
+                        + "\n source: " + mr.getSourceBranch() 
+                        + "\n target: " + mr.getTargetBranch() 
+                        + "\n state: " + mr.getState() 
+                        + "\n assign: " + assignee 
+                        + "\n author: " + mr.getAuthor().getName() 
+                        + "\n email: " + mr.getAuthor().getEmail() 
+                        + "\n id: " + mr.getId() 
+                        + "\n iid: " + mr.getIid() 
+                        + "\n last commit: " + lastCommit.getId() 
+                        + "\n\n");
+
+                    GitLabMergeRequest newReq = new GitLabMergeRequest();
 					newReq.setObject_kind("merge_request");
 					newReq.setObjectAttribute(new ObjectAttributes());
-					if (mr.getAssignee() != null)
+
+					if (assignee != null)
 						newReq.getObjectAttribute().setAssignee(mr.getAssignee());
 					if (mr.getAuthor() != null)
-                        newReq.getObjectAttribute().setAuthor(mr.getAuthor());
+                        newReq.getObjectAttribute().setAuthor(mr.getAuthor());       
+
 					newReq.getObjectAttribute().setDescription(mr.getDescription());
 					newReq.getObjectAttribute().setId(mr.getId());
 					newReq.getObjectAttribute().setIid(mr.getIid());

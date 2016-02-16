@@ -14,6 +14,9 @@ import hudson.model.ParameterDefinition;
 import hudson.model.ParametersAction;
 import hudson.model.ParametersDefinitionProperty;
 import hudson.model.Run;
+import hudson.model.TaskListener;
+import hudson.model.AbstractBuild;
+import hudson.Util;
 import hudson.model.StringParameterValue;
 import hudson.plugins.git.RevisionParameterAction;
 import hudson.plugins.git.GitSCM;
@@ -82,6 +85,9 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
     private boolean ciSkip = true;
     private boolean setBuildDescription = true;
     private boolean addNoteOnMergeRequest = true;
+    private boolean notesCustomize = false;
+    private final String successNoteOnMergeRequests;
+    private final String failureNoteOnMergeRequests;
     private boolean addCiMessage = false;
     private boolean addVoteOnMergeRequest = true;
     private final String branchFilterName;
@@ -92,7 +98,8 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
 
     @DataBoundConstructor
     public GitLabPushTrigger(boolean triggerOnPush, boolean triggerOnMergeRequest, String triggerOpenMergeRequestOnPush,
-                             boolean ciSkip, boolean setBuildDescription, boolean addNoteOnMergeRequest, boolean addCiMessage,
+                             boolean ciSkip, boolean setBuildDescription, boolean addNoteOnMergeRequest, boolean notesCustomize, 
+                             String successNoteOnMergeRequests, String failureNoteOnMergeRequests, boolean addCiMessage,
                              boolean addVoteOnMergeRequest, boolean acceptMergeRequestOnSuccess, String branchFilterName,
                              String includeBranchesSpec, String excludeBranchesSpec, String targetBranchRegex) {
         this.triggerOnPush = triggerOnPush;
@@ -101,6 +108,9 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
         this.ciSkip = ciSkip;
         this.setBuildDescription = setBuildDescription;
         this.addNoteOnMergeRequest = addNoteOnMergeRequest;
+        this.notesCustomize = notesCustomize;
+        this.successNoteOnMergeRequests = successNoteOnMergeRequests;
+        this.failureNoteOnMergeRequests = failureNoteOnMergeRequests;
         this.addCiMessage = addCiMessage;
         this.addVoteOnMergeRequest = addVoteOnMergeRequest;
         this.branchFilterName = branchFilterName;
@@ -136,6 +146,10 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
 
     public boolean getAcceptMergeRequestOnSuccess() {
         return acceptMergeRequestOnSuccess;
+    }
+
+    public boolean getNotesCustomize() {
+        return notesCustomize;
     }
 
     public boolean getAddCiMessage() {
@@ -279,9 +293,6 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
                     values.put("gitlabActionType", new StringParameterValue("gitlabActionType", "PUSH"));
                     values.put("gitlabUserName", new StringParameterValue("gitlabUserName", req.getCommits().get(0).getAuthor().getName()));
                     values.put("gitlabUserEmail", new StringParameterValue("gitlabUserEmail", req.getCommits().get(0).getAuthor().getEmail()));
-                    values.put("gitlabMergeRequestTitle", new StringParameterValue("gitlabMergeRequestTitle", ""));
-                    values.put("gitlabMergeRequestId", new StringParameterValue("gitlabMergeRequestId", ""));
-                    values.put("gitlabMergeRequestAssignee", new StringParameterValue("gitlabMergeRequestAssignee", ""));
 
                     LOGGER.log(Level.INFO, "Trying to get name and URL for job: {0}", job.getFullName());
                     String sourceRepoName = getDesc().getSourceRepoNameDefault(job);
@@ -354,7 +365,7 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
     		getDescriptor().queue.execute(new Runnable() {
                 public void run() {
 	                LOGGER.log(Level.INFO, "{0} triggered for merge request.", job.getFullName());
-                  String name = " #" + job.getNextBuildNumber();
+                    String name = " #" + job.getNextBuildNumber();
 
 	                GitLabMergeCause cause = createGitLabMergeCause(req);
 	                Action[] actions = createActions(req);
@@ -400,7 +411,7 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
 
                     Map<String, ParameterValue> values = getDefaultParameters();
                     values.put("gitlabSourceBranch", new StringParameterValue("gitlabSourceBranch", getSourceBranch(req)));
-                    values.put("gitlabTargetBranch", new StringParameterValue("gitlabTargetBranch", req.getObjectAttribute().getTargetBranch()));
+                    values.put("gitlabTargetBranch", new StringParameterValue("gitlabTargetBranch", getTargetBranch(req)));
                     values.put("gitlabActionType", new StringParameterValue("gitlabActionType", "MERGE"));
                     if (req.getObjectAttribute().getAuthor() != null) {
                         values.put("gitlabUserName", new StringParameterValue("gitlabUserName", req.getObjectAttribute().getAuthor().getName()));
@@ -411,7 +422,6 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
                     if (req.getObjectAttribute().getAssignee() != null) {
                         values.put("gitlabMergeRequestAssignee", new StringParameterValue("gitlabMergeRequestAssignee", req.getObjectAttribute().getAssignee().getName()));
                     }
-
 
                     LOGGER.log(Level.INFO, "Trying to get name and URL for job: {0}", job.getFullName());
                     String sourceRepoName = getDesc().getSourceRepoNameDefault(job);
@@ -458,16 +468,16 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
         return values;
     }
 
-    private void setBuildCauseInJob(Run run){
+    private void setBuildCauseInJob(AbstractBuild<?, ?> build){
         if(setBuildDescription){
-            Cause pcause= run.getCause(GitLabPushCause.class);
-            Cause mcause= run.getCause(GitLabMergeCause.class);
+            Cause pcause= build.getCause(GitLabPushCause.class);
+            Cause mcause= build.getCause(GitLabMergeCause.class);
             String desc = null;
             if(pcause!=null) desc = pcause.getShortDescription();
             if(mcause!=null) desc = mcause.getShortDescription();
             if(desc!=null && desc.length()>0){
                 try {
-                    run.setDescription(desc);
+                    build.setDescription(desc);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -475,20 +485,20 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
         }
     }
 
-    public void onCompleted(Run run){
-        Cause mCause= run.getCause(GitLabMergeCause.class);
+    public void onCompleted(AbstractBuild<?, ?> build, TaskListener listener){
+        Cause mCause= build.getCause(GitLabMergeCause.class);
         if (mCause != null && mCause instanceof GitLabMergeCause) {
-            onCompleteMergeRequest(run, (GitLabMergeCause) mCause);
+            onCompleteMergeRequest(build, listener, (GitLabMergeCause) mCause);
         }
 
-        Cause pCause= run.getCause(GitLabPushCause.class);
+        Cause pCause= build.getCause(GitLabPushCause.class);
         if (pCause != null && pCause instanceof GitLabPushCause) {
-            onCompletedPushRequest(run, (GitLabPushCause) pCause);
+            onCompletedPushRequest(build, (GitLabPushCause) pCause);
         }
 
     }
 
-    private void onCompletedPushRequest(Run run, GitLabPushCause cause) {
+    private void onCompletedPushRequest(AbstractBuild<?, ?> build, GitLabPushCause cause) {
         if(addCiMessage) {
             String status;
             if (run.getResult() == Result.ABORTED) {
@@ -502,8 +512,63 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
         }
     }
 
-    private void onCompleteMergeRequest(Run run,GitLabMergeCause cause){
-        if (acceptMergeRequestOnSuccess && run.getResult() == Result.SUCCESS) {
+    public static String replaceMacros(AbstractBuild<?, ?> build, TaskListener listener, String inputString) {
+        String returnString = inputString;
+        if (build != null && inputString != null) {
+            try {
+                Map<String, String> messageEnvVars = getEnvVars(build, listener);
+                returnString = Util.replaceMacro(inputString, messageEnvVars);
+
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "Couldn't replace macros in message: ", e);
+            }
+        }
+        return returnString;
+    }
+
+    public static Map<String, String> getEnvVars(AbstractBuild<?, ?> build, TaskListener listener) {
+        Map<String, String> messageEnvVars = new HashMap<String, String>();
+        if (build != null) {
+                messageEnvVars.putAll(build.getCharacteristicEnvVars());
+                messageEnvVars.putAll(build.getBuildVariables());
+                try {
+                    messageEnvVars.putAll(build.getEnvironment(listener));
+                } catch (Exception e) {
+                    LOGGER.log(Level.WARNING, "Couldn't get Env Variables: ", e);
+                }
+        }
+        return messageEnvVars;
+    }
+
+    public StringBuilder getNote(AbstractBuild<?, ?> build, TaskListener listener) {
+        StringBuilder msg = new StringBuilder();
+        String buildUrl = Jenkins.getInstance().getRootUrl() + build.getUrl();
+        String defaultNote = " Jenkins Build " + build.getResult().color.getDescription() 
+        + "\n\nResults available at: [Jenkins " + buildUrl + "](" + buildUrl + ")";
+
+        if (build.getResult() == Result.SUCCESS) {
+            if (notesCustomize) {
+                String message = replaceMacros(build, listener, successNoteOnMergeRequests);
+                msg.append(message);
+            } else {
+                String icon = addVoteOnMergeRequest ? ":+1:" : ":white_check_mark:";
+                msg.append(icon).append(defaultNote);
+            }
+        } else {
+            if (notesCustomize) {
+                String message = replaceMacros(build, listener, failureNoteOnMergeRequests);
+                msg.append(message);
+            } else {
+                String icon = addVoteOnMergeRequest ? ":-1:" : ":anguished:";
+                msg.append(icon).append(defaultNote);
+            }
+        }
+
+        return msg;
+    }
+
+    private void onCompleteMergeRequest(AbstractBuild<?, ?> build, TaskListener listener, GitLabMergeCause cause) {
+        if (acceptMergeRequestOnSuccess && build.getResult() == Result.SUCCESS) {
             try {
                 GitlabProject proj = new GitlabProject();
                 proj.setId(cause.getMergeRequest().getObjectAttribute().getTargetProjectId());
@@ -516,18 +581,8 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
             }
         }
         if(addNoteOnMergeRequest) {
-            StringBuilder msg = new StringBuilder();
-            if (run.getResult() == Result.SUCCESS) {
-                String icon = addVoteOnMergeRequest ? ":+1:" : ":white_check_mark:";
-                msg.append(icon);
-            } else {
-                String icon = addVoteOnMergeRequest ? ":-1:" : ":anguished:";
-                msg.append(icon);
-            }
-            msg.append(" Jenkins Build ").append(run.getResult().color.getDescription());
-            String buildUrl = Jenkins.getInstance().getRootUrl() + run.getUrl();
-            msg.append("\n\nResults available at: ")
-                    .append("[").append("Jenkins " + buildUrl).append("](").append(buildUrl).append(")");
+            StringBuilder msg = getNote(build, listener);
+
             try {
                 GitlabProject proj = new GitlabProject();
                 proj.setId(cause.getMergeRequest().getObjectAttribute().getTargetProjectId());
@@ -551,29 +606,29 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
         }
     }
 
-    public void onStarted(Run run) {
-        setBuildCauseInJob(run);
+    public void onStarted(AbstractBuild<?, ?> build) {
+        setBuildCauseInJob(build);
 
-        Cause mCause= run.getCause(GitLabMergeCause.class);
+        Cause mCause= build.getCause(GitLabMergeCause.class);
         if (mCause != null && mCause instanceof GitLabMergeCause) {
-            onStartedMergeRequest(run, (GitLabMergeCause) mCause);
+            onStartedMergeRequest(build, (GitLabMergeCause) mCause);
         }
 
-        Cause pCause= run.getCause(GitLabPushCause.class);
+        Cause pCause= build.getCause(GitLabPushCause.class);
         if (pCause != null && pCause instanceof GitLabPushCause) {
-            onStartedPushRequest(run, (GitLabPushCause) pCause);
+            onStartedPushRequest(build, (GitLabPushCause) pCause);
         }
     }
 
-    private void onStartedPushRequest(Run run, GitLabPushCause cause) {
+    private void onStartedPushRequest(AbstractBuild<?, ?> build, GitLabPushCause cause) {
         if(addCiMessage) {
-            cause.getPushRequest().createCommitStatus(this.getDescriptor().getGitlab().instance(), "running", Jenkins.getInstance().getRootUrl() + run.getUrl());
+            cause.getPushRequest().createCommitStatus(this.getDescriptor().getGitlab().instance(), "running", Jenkins.getInstance().getRootUrl() + build.getUrl());
         }
     }
 
-    private void onStartedMergeRequest(Run run, GitLabMergeCause cause) {
+    private void onStartedMergeRequest(AbstractBuild<?, ?> build, GitLabMergeCause cause) {
         if(addCiMessage) {
-            cause.getMergeRequest().createCommitStatus(this.getDescriptor().getGitlab().instance(), "running", Jenkins.getInstance().getRootUrl() + run.getUrl());
+            cause.getMergeRequest().createCommitStatus(this.getDescriptor().getGitlab().instance(), "running", Jenkins.getInstance().getRootUrl() + build.getUrl());
         }
     }
 
@@ -586,6 +641,17 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
     	}
 
     	return result;
+    }
+
+    private String getTargetBranch(GitLabRequest req) {
+        String result = null;
+        if (req instanceof GitLabPushRequest) {
+            result = ((GitLabPushRequest)req).getRef().replaceAll("refs/heads/", "");
+        } else {
+            result = ((GitLabMergeRequest)req).getObjectAttribute().getTargetBranch();
+        }
+
+        return result;
     }
 
     @Override

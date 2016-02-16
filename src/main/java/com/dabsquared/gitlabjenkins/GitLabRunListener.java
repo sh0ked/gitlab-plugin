@@ -16,19 +16,19 @@ import javax.annotation.Nonnull;
  * in order to have access to the build and set properties.
  */
 @Extension
-public class GitLabRunListener extends RunListener<Run> {
+public class GitLabRunListener extends RunListener<AbstractBuild<?, ?>> {
 
     @Override
-    public void onCompleted(Run run, @Nonnull TaskListener listener) {
+    public void onCompleted(AbstractBuild<?, ?> run, @Nonnull TaskListener listener) {
         GitLabPushTrigger trig = getTrigger(run);
         if (trig != null) {
-            trig.onCompleted(run);
+            trig.onCompleted(run, listener);
         }
         super.onCompleted(run, listener);
     }
 
     @Override
-    public void onStarted(Run run, TaskListener listener) {
+    public void onStarted(AbstractBuild<?, ?> run, TaskListener listener) {
         GitLabPushTrigger trig = getTrigger(run);
         if (trig != null) {
             trig.onStarted(run);
@@ -37,7 +37,7 @@ public class GitLabRunListener extends RunListener<Run> {
     }
 
 
-    private GitLabPushTrigger getTrigger(Run run) {
+    private GitLabPushTrigger getTrigger(AbstractBuild<?, ?> run) {
         if (run instanceof AbstractBuild) {
             ParameterizedJobMixIn.ParameterizedJob p = ((AbstractBuild) run).getProject();
             for (Trigger t : p.getTriggers().values()) {

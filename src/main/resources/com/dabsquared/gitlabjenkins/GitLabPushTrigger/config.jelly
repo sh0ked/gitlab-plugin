@@ -23,6 +23,23 @@
              help="/plugin/gitlab-plugin/help/help-gitlab8.1CI.html">
         <f:checkbox default="false"/>
     </f:entry>
+    
+    <f:block>
+      <table style="margin-left:10px; width:100%">
+      <f:optionalBlock checked="${instance.notesCustomize}" title="Customize notes for merge requests" inline="true">
+        <f:entry title="Enabled">
+          <f:checkbox default="false" field="notesCustomize"/>
+        </f:entry>
+        <f:entry title="On success">
+          <f:textarea field="successNoteOnMergeRequests"/>
+        </f:entry>
+        <f:entry title="On failure">
+          <f:textarea field="failureNoteOnMergeRequests"/>
+        </f:entry>
+      </f:optionalBlock>
+      </table>
+    </f:block>
+
     <f:entry title="Vote added to note with build status on merge requests" field="addVoteOnMergeRequest">
         <f:checkbox default="true"/>
     </f:entry>
