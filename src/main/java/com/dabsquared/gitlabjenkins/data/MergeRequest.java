@@ -6,7 +6,7 @@ import org.gitlab.api.models.GitlabUser;
 
 import java.util.Date;
 
-public class ObjectAttributes {
+public class MergeRequest {
 
     private Integer id;
 
@@ -44,7 +44,9 @@ public class ObjectAttributes {
 
     private String action;
 
-    public ObjectAttributes() {
+    private String body;
+
+    public MergeRequest() {
     }
 
     @Override

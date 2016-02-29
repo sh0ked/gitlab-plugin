@@ -4,6 +4,12 @@
     <f:entry title="Build on Merge Request Events" field="triggerOnMergeRequest">
         <f:checkbox default="true"/>
     </f:entry>
+    <f:entry title="Build on Note Events" field="triggerOnNoteRequest">
+        <f:checkbox default="false"/>
+    </f:entry>
+    <f:entry title="Note Regex">
+        <f:textbox field="noteRegex"/>
+    </f:entry>
     <f:entry title="Build on Push Events" field="triggerOnPush">
         <f:checkbox default="true"/>
     </f:entry>

@@ -1,7 +1,7 @@
 package com.dabsquared.gitlabjenkins;
 
 import com.dabsquared.gitlabjenkins.data.LastCommit;
-import com.dabsquared.gitlabjenkins.data.ObjectAttributes;
+import com.dabsquared.gitlabjenkins.data.MergeRequest;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import hudson.Extension;
@@ -48,6 +48,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 /**
  *
@@ -336,6 +337,8 @@ public class GitLabWebHook implements UnprotectedRootAction {
             this.generateMergeRequestBuild(data, project, req, rsp);
         } else if (objectType != null && objectType.equals("push")) {
             this.generatePushBuild(data, project, req, rsp);
+        } else if (objectType != null && objectType.equals("note")) {
+            this.generateNoteBuild(data, project, req, rsp);
         } else {
             LOGGER.log(Level.INFO, "Trigger not found for webhook type: {0}", objectType);
             return;
@@ -429,7 +432,7 @@ public class GitLabWebHook implements UnprotectedRootAction {
 
                     GitLabMergeRequest newReq = new GitLabMergeRequest();
 					newReq.setObject_kind("merge_request");
-					newReq.setObjectAttribute(new ObjectAttributes());
+					newReq.setObjectAttribute(new MergeRequest());
 
 					if (assignee != null)
 						newReq.getObjectAttribute().setAssignee(mr.getAssignee());
@@ -450,7 +453,8 @@ public class GitLabWebHook implements UnprotectedRootAction {
 					Authentication old = SecurityContextHolder.getContext().getAuthentication();
 					SecurityContextHolder.getContext().setAuthentication(ACL.SYSTEM);
 					try {
-						trigger.onPost(newReq);
+                        if (trigger.getTriggerOnMergeRequest())
+						    trigger.onPost(newReq);
 					} finally {
 						SecurityContextHolder.getContext().setAuthentication(old);
 					}
@@ -515,7 +519,58 @@ public class GitLabWebHook implements UnprotectedRootAction {
                 return;
             }
 
-            trigger.onPost(request);
+            if (trigger.getTriggerOnMergeRequest())
+                trigger.onPost(request);
+        } finally {
+            SecurityContextHolder.getContext().setAuthentication(old);
+        }
+    }
+
+    public void generateNoteBuild(String json, Job project, StaplerRequest req, StaplerResponse rsp) {
+        GitLabNoteRequest note = GitLabNoteRequest.create(json);
+        GitLabMergeRequest newReq = new GitLabMergeRequest();
+
+        newReq.setObject_kind("merge_request");
+        newReq.setObjectAttribute(new MergeRequest());
+
+        if (note.getMergeRequestAttribute().getAuthor() != null)
+            newReq.getObjectAttribute().setAuthor(note.getMergeRequestAttribute().getAuthor());
+
+        newReq.getObjectAttribute().setAssignee(note.getMergeRequestAttribute().getAssignee());
+        newReq.getObjectAttribute().setDescription(note.getMergeRequestAttribute().getDescription());
+        newReq.getObjectAttribute().setId(note.getMergeRequestAttribute().getId());
+        newReq.getObjectAttribute().setIid(note.getMergeRequestAttribute().getIid());
+        newReq.getObjectAttribute().setMergeStatus(note.getMergeRequestAttribute().getState());
+        newReq.getObjectAttribute().setSourceBranch(note.getMergeRequestAttribute().getSourceBranch());
+        newReq.getObjectAttribute().setSourceProjectId(note.getMergeRequestAttribute().getSourceProjectId());
+        newReq.getObjectAttribute().setTargetBranch(note.getMergeRequestAttribute().getTargetBranch());
+        newReq.getObjectAttribute().setTargetProjectId(note.getObjectAttribute().getProjectId());
+        newReq.getObjectAttribute().setTitle(note.getMergeRequestAttribute().getTitle());
+        newReq.getObjectAttribute().setLastCommit(note.getMergeRequestAttribute().getLastCommit());
+
+        Authentication old = SecurityContextHolder.getContext().getAuthentication();
+        SecurityContextHolder.getContext().setAuthentication(ACL.SYSTEM);
+        try {
+            GitLabPushTrigger trigger = null;
+            if (project instanceof ParameterizedJobMixIn.ParameterizedJob) {
+                ParameterizedJobMixIn.ParameterizedJob p = (ParameterizedJobMixIn.ParameterizedJob) project;
+                for (Trigger t : p.getTriggers().values()) {
+                    if (t instanceof GitLabPushTrigger) {
+                        trigger = (GitLabPushTrigger) t;
+                    }
+                }
+            }
+            if (trigger == null) {
+                return;
+            }
+            if (trigger.getCiSkip() && newReq.getObjectAttribute().getDescription().contains("[ci-skip]")) {
+                LOGGER.log(Level.INFO, "Skipping MR " + newReq.getObjectAttribute().getTitle() + " due to ci-skip.");
+                return;
+            }
+
+            if (trigger.getTriggerOnNoteRequest() && trigger.isValidTriggerPhrase(note.getObjectAttribute().getNote()))
+                trigger.onPost(newReq);
+
         } finally {
             SecurityContextHolder.getContext().setAuthentication(old);
         }

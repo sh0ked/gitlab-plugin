@@ -1,5 +1,6 @@
 package com.dabsquared.gitlabjenkins;
 
+import com.dabsquared.gitlabjenkins.data.Note;
 import com.dabsquared.gitlabjenkins.data.MergeRequest;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.lang.builder.ToStringStyle;
@@ -9,35 +10,33 @@ import org.gitlab.api.models.GitlabProject;
 
 import java.io.IOException;
 
-/**
- * Represents for WebHook payload
- *
- * @author Daniel Brooks
- */
-public class GitLabMergeRequest extends GitLabRequest {
+public class GitLabNoteRequest extends GitLabRequest {
 
-	public static GitLabMergeRequest create(String payload) {
+	public static GitLabNoteRequest create(String payload) {
         if (payload == null) {
             throw new IllegalArgumentException("payload should not be null");
         }
-     
-        GitLabMergeRequest pushRequest =  Builder.INSTANCE.get().fromJson(payload, GitLabMergeRequest.class);
-        return pushRequest;
+
+        GitLabNoteRequest noteRequest =  Builder.INSTANCE.get().fromJson(payload, GitLabNoteRequest.class);
+        return noteRequest;
     }
-    
-    public GitLabMergeRequest() {
+
+    public GitLabNoteRequest() {
     }
 
     private String object_kind;
 
-    private MergeRequest objectAttributes;
+    private Note objectAttributes;
+
+    private MergeRequest mergeRequest;
+
     private GitlabProject sourceProject = null;
-    
+
     public GitlabProject getSourceProject (GitLab api) throws IOException {
-    	if (sourceProject == null) {
-    		sourceProject = api.instance().getProject(objectAttributes.getSourceProjectId());
-    	}
-    	return sourceProject;
+        if (sourceProject == null) {
+            sourceProject = api.instance().getProject(mergeRequest.getSourceProjectId());
+        }
+        return sourceProject;
     }
 
     public String getObject_kind() {
@@ -48,14 +47,21 @@ public class GitLabMergeRequest extends GitLabRequest {
         this.object_kind = objectKind;
     }
 
-    public MergeRequest getObjectAttribute() {
+    public Note getObjectAttribute() {
         return objectAttributes;
     }
 
-    public void setObjectAttribute(MergeRequest objectAttributes) {
+    public void setObjectAttribute(Note objectAttributes) {
         this.objectAttributes = objectAttributes;
     }
 
+    public MergeRequest getMergeRequestAttribute() {
+        return mergeRequest;
+    }
+
+    public void setMergeRequestAttribute(MergeRequest mergeRequest) {
+        this.mergeRequest = this.mergeRequest;
+    }
 
     @Override
     public String toString() {
@@ -64,8 +70,8 @@ public class GitLabMergeRequest extends GitLabRequest {
 
     public GitlabCommitStatus createCommitStatus(GitlabAPI api, String status, String targetUrl) {
         try {
-            if (objectAttributes.getLastCommit() != null) {
-                return api.createCommitStatus(sourceProject, objectAttributes.getLastCommit().getId(), status, objectAttributes.getLastCommit().getId(), "Jenkins", targetUrl, null);
+            if (mergeRequest.getLastCommit() != null) {
+                return api.createCommitStatus(sourceProject, mergeRequest.getLastCommit().getId(), status, mergeRequest.getLastCommit().getId(), "Jenkins", targetUrl, null);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -73,5 +79,4 @@ public class GitLabMergeRequest extends GitLabRequest {
 
         return null;
     }
-
 }
