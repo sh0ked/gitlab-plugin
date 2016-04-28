@@ -13,6 +13,9 @@
     <f:entry title="Build on Push Events" field="triggerOnPush">
         <f:checkbox default="true"/>
     </f:entry>
+    <f:entry title="Abort started and queued builds when got push event with same branch" field="stopBuildWithSameBranchEnabled">
+        <f:checkbox default="false"/>
+    </f:entry>
     <f:entry title="Rebuild open Merge Requests" field="triggerOpenMergeRequestOnPush">
         <f:select/>
     </f:entry>

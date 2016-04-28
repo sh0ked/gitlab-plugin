@@ -1,40 +1,24 @@
 package com.dabsquared.gitlabjenkins;
 
+import com.google.common.collect.*;
 import hudson.Extension;
 import hudson.Util;
-import hudson.model.Action;
-import hudson.model.AutoCompletionCandidates;
-import hudson.model.Item;
-import hudson.model.ParameterValue;
-import hudson.model.Result;
-import hudson.model.AbstractProject;
-import hudson.model.Cause;
-import hudson.model.Job;
-import hudson.model.ParameterDefinition;
-import hudson.model.ParametersAction;
-import hudson.model.ParametersDefinitionProperty;
-import hudson.model.Run;
-import hudson.model.TaskListener;
-import hudson.model.AbstractBuild;
-import hudson.Util;
-import hudson.model.StringParameterValue;
+import hudson.model.*;
+import hudson.model.Queue;
+import hudson.plugins.git.Branch;
 import hudson.plugins.git.RevisionParameterAction;
 import hudson.plugins.git.GitSCM;
+import hudson.plugins.git.util.BuildData;
+import hudson.plugins.git.util.MergeRecord;
 import hudson.scm.SCM;
 import hudson.triggers.Trigger;
 import hudson.triggers.TriggerDescriptor;
-import hudson.util.FormValidation;
-import hudson.util.SequentialExecutionQueue;
-import hudson.util.XStream2;
-import hudson.util.ListBoxModel;
+import hudson.util.*;
 import hudson.util.ListBoxModel.Option;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -58,10 +42,6 @@ import org.springframework.util.AntPathMatcher;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Splitter;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
 import com.thoughtworks.xstream.converters.Converter;
 import com.thoughtworks.xstream.converters.MarshallingContext;
 import com.thoughtworks.xstream.converters.UnmarshallingContext;
@@ -70,6 +50,8 @@ import com.thoughtworks.xstream.converters.reflection.AbstractReflectionConverte
 import com.thoughtworks.xstream.io.HierarchicalStreamReader;
 import com.thoughtworks.xstream.io.HierarchicalStreamWriter;
 import com.thoughtworks.xstream.mapper.MapperWrapper;
+
+import javax.servlet.ServletException;
 
 
 /**
@@ -80,6 +62,7 @@ import com.thoughtworks.xstream.mapper.MapperWrapper;
 public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
 	private static final Logger LOGGER = Logger.getLogger(GitLabPushTrigger.class.getName());
 	private boolean triggerOnPush = true;
+	private boolean stopBuildWithSameBranchEnabled = false;
     private boolean triggerOnMergeRequest = true;
     private boolean triggerOnNoteRequest = false;
     private final String noteRegex;
@@ -99,13 +82,14 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
     private boolean acceptMergeRequestOnSuccess = false;
 
     @DataBoundConstructor
-    public GitLabPushTrigger(boolean triggerOnPush, boolean triggerOnMergeRequest, String triggerOpenMergeRequestOnPush,
+    public GitLabPushTrigger(boolean triggerOnPush, boolean stopBuildWithSameBranchEnabled, boolean triggerOnMergeRequest, String triggerOpenMergeRequestOnPush,
                              boolean triggerOnNoteRequest, String noteRegex, boolean ciSkip, boolean setBuildDescription,
                              boolean addNoteOnMergeRequest, boolean notesCustomize, String successNoteOnMergeRequests,
                              String failureNoteOnMergeRequests, boolean addCiMessage, boolean addVoteOnMergeRequest,
                              boolean acceptMergeRequestOnSuccess, String branchFilterName, String includeBranchesSpec,
                              String excludeBranchesSpec, String targetBranchRegex) {
         this.triggerOnPush = triggerOnPush;
+        this.stopBuildWithSameBranchEnabled = stopBuildWithSameBranchEnabled;
         this.triggerOnMergeRequest = triggerOnMergeRequest;
         this.triggerOnNoteRequest = triggerOnNoteRequest;
         this.noteRegex = noteRegex;
@@ -127,6 +111,10 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
 
     public boolean getTriggerOnPush() {
     	return triggerOnPush;
+    }
+
+    public boolean getStopBuildWithSameBranchEnabled() {
+    	return stopBuildWithSameBranchEnabled;
     }
 
     public boolean getTriggerOnMergeRequest() {
@@ -266,7 +254,6 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
         };
 
         if (triggerOnPush && this.isBranchAllowed(this.getSourceBranch(req))) {
-
             getDescriptor().queue.execute(new Runnable() {
 
                 public void run() {
@@ -389,6 +376,52 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
         return revision;
     }
 
+    private Run getBuildByBranch(AbstractProject<?, ?> project, String branch) {
+        RunList<?> builds = project.getBuilds();
+        for(Run build : builds) {
+            BuildData data = build.getAction(BuildData.class);
+            if(data!=null && data.lastBuild!=null) {
+                MergeRecord merge = build.getAction(MergeRecord.class);
+                boolean isMergeBuild = merge != null && !merge.getSha1().equals(data.lastBuild.getMarked().getSha1String());
+                if (data.lastBuild.getRevision() != null && !isMergeBuild) {
+                    for (Branch b : data.lastBuild.getRevision().getBranches()) {
+                        if (b.getName().endsWith("/" + branch))
+                            return build;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    public void stopBuildWithSameBranch(AbstractProject<?, ?> project, GitLabMergeRequest req) throws IOException, ServletException {
+        String sourceBranch = req.getObjectAttribute().getSourceBranch();
+        Run lastBuild = getBuildByBranch(project, sourceBranch);
+        Queue queue = Jenkins.getInstance().getQueue();
+
+        for (hudson.model.Queue.Item item : queue.getItems()) {
+            LOGGER.fine("Queue Item: " + item.getParams());
+            List itemParams = Arrays.asList(item.getParams().split("\n"));
+            if (!itemParams.isEmpty()) {
+                String sourceBranchParam = null;
+                for (Object itemParam : itemParams) {
+                    String paramItem = itemParam.toString();
+                    sourceBranchParam = paramItem.startsWith("gitlabSourceBranch") ? Arrays.asList(paramItem.split("=")).get(1) : sourceBranchParam;
+                }
+                LOGGER.info("Compare build on branch " + sourceBranchParam + " in Queue with new build on branch " + sourceBranch);
+                if (sourceBranchParam != null && sourceBranch.contentEquals(sourceBranchParam)) {
+                    LOGGER.info("Found build for branch " + sourceBranch + " in queue and will be aborted now.");
+                    queue.cancel(item);
+                }
+            }
+        }
+
+        if (lastBuild != null && lastBuild.isBuilding()) {
+            LOGGER.info("Found running build #" + lastBuild.getId() + " for branch " + sourceBranch + " and will be stop now.");
+            project.getBuild(lastBuild.getId()).doStop();
+        }
+    }
+
     // executes when the Trigger receives a merge request
     public void onPost(final GitLabMergeRequest req) {
         if (this.isBranchAllowed(req.getObjectAttribute().getTargetBranch())) {
@@ -407,6 +440,14 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
                     boolean scheduled;
                     if (job instanceof AbstractProject<?, ?>) {
                         AbstractProject job_ap = (AbstractProject<?, ?>) job;
+                        if (stopBuildWithSameBranchEnabled) {
+                            try {
+                                stopBuildWithSameBranch(job_ap, req);
+                            } catch (Exception e) {
+                                LOGGER.warning("Error during stopping build with same branch: \n" + e.toString());
+                                e.printStackTrace();
+                            }
+                        }
                         scheduled = job_ap.scheduleBuild(job_ap.getQuietPeriod(), cause, actions);
                     } else {
                         scheduled = scheduledJob.scheduleBuild(cause);
@@ -443,6 +484,7 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
                     }
                     values.put("gitlabMergeRequestTitle", new StringParameterValue("gitlabMergeRequestTitle", req.getObjectAttribute().getTitle()));
                     values.put("gitlabMergeRequestId", new StringParameterValue("gitlabMergeRequestId", req.getObjectAttribute().getIid().toString()));
+                    values.put("gitlabLastCommit", new StringParameterValue("gitlabLastCommit", req.getObjectAttribute().getLastCommit().getId()));
                     if (req.getObjectAttribute().getAssignee() != null) {
                         values.put("gitlabMergeRequestAssignee", new StringParameterValue("gitlabMergeRequestAssignee", req.getObjectAttribute().getAssignee().getName()));
                     }
