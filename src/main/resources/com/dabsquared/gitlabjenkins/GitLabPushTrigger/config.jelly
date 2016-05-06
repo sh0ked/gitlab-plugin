@@ -22,29 +22,6 @@
   <f:entry title="Set build description to build cause (eg. Merge request or Git Push )" field="setBuildDescription">
     <f:checkbox default="true"/>
   </f:entry>
-  <f:entry title="Add note with build status on merge requests" field="addNoteOnMergeRequest">
-    <f:checkbox default="true"/>
-  </f:entry>
-
-  <f:block>
-     <table style="margin-left:10px; width:100%">
-        <f:optionalBlock checked="${instance.notesCustomize}" title="Customize notes for merge requests" inline="true">
-          <f:entry title="Enabled">
-            <f:checkbox default="false" field="notesCustomize"/>
-          </f:entry>
-          <f:entry title="On success">
-            <f:textarea field="successNoteOnMergeRequests"/>
-          </f:entry>
-          <f:entry title="On failure">
-            <f:textarea field="failureNoteOnMergeRequests"/>
-          </f:entry>
-          <f:entry title="On abort">
-            <f:textarea field="abortNoteOnMergeRequests"/>
-          </f:entry>
-        </f:optionalBlock>
-     </table>
-  </f:block>
-
   <f:entry title="Vote added to note with build status on merge requests" field="addVoteOnMergeRequest">
     <f:checkbox default="true"/>
   </f:entry>

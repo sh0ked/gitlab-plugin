@@ -7,6 +7,7 @@ import com.dabsquared.gitlabjenkins.gitlab.hook.model.MergeRequestHook;
 import com.dabsquared.gitlabjenkins.gitlab.hook.model.NoteHook;
 import com.dabsquared.gitlabjenkins.gitlab.hook.model.PushHook;
 import com.dabsquared.gitlabjenkins.publisher.GitLabCommitStatusPublisher;
+import com.dabsquared.gitlabjenkins.publisher.GitLabMessagePublisher;
 import com.dabsquared.gitlabjenkins.trigger.TriggerOpenMergeRequest;
 import com.dabsquared.gitlabjenkins.trigger.branch.ProjectBranchesProvider;
 import com.dabsquared.gitlabjenkins.trigger.filter.BranchFilter;
@@ -16,7 +17,6 @@ import com.dabsquared.gitlabjenkins.trigger.handler.merge.MergeRequestHookTrigge
 import com.dabsquared.gitlabjenkins.trigger.handler.note.NoteHookTriggerHandler;
 import com.dabsquared.gitlabjenkins.trigger.handler.push.PushHookTriggerHandler;
 import com.dabsquared.gitlabjenkins.webhook.GitLabWebHook;
-import com.sun.org.apache.xpath.internal.operations.Bool;
 import hudson.Extension;
 import hudson.Util;
 import hudson.init.InitMilestone;
@@ -36,7 +36,6 @@ import jenkins.model.ParameterizedJobMixIn;
 import jenkins.triggers.SCMTriggerItem.SCMTriggerItems;
 import net.karneim.pojobuilder.GeneratePojoBuilder;
 import net.sf.json.JSONObject;
-import org.apache.commons.lang.StringUtils;
 import org.kohsuke.stapler.Ancestor;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
@@ -46,7 +45,6 @@ import org.kohsuke.stapler.StaplerRequest;
 
 import java.io.IOException;
 import java.io.ObjectStreamException;
-import java.util.regex.Pattern;
 
 import static com.dabsquared.gitlabjenkins.trigger.filter.BranchFilterConfig.BranchFilterConfigBuilder.branchFilterConfig;
 import static com.dabsquared.gitlabjenkins.trigger.handler.merge.MergeRequestHookTriggerHandlerFactory.newMergeRequestHookTriggerHandler;
@@ -68,10 +66,6 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
     private boolean ciSkip = true;
     private boolean setBuildDescription = true;
     private boolean addNoteOnMergeRequest = true;
-    private boolean notesCustomize = false;
-    private String successNoteOnMergeRequests;
-    private String failureNoteOnMergeRequests;
-    private String abortNoteOnMergeRequests;
     private boolean addCiMessage = false;
     private boolean addVoteOnMergeRequest = true;
     private transient boolean allowAllBranches = false;
@@ -91,10 +85,8 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
     @GeneratePojoBuilder(intoPackage = "*.builder.generated", withFactoryMethod = "*")
     public GitLabPushTrigger(boolean triggerOnPush, boolean triggerOnMergeRequest, TriggerOpenMergeRequest triggerOpenMergeRequestOnPush,
                              boolean triggerOnNoteRequest, String noteRegex, boolean ciSkip, boolean setBuildDescription,
-                             boolean addNoteOnMergeRequest, boolean notesCustomize, String successNoteOnMergeRequests,
-                             String failureNoteOnMergeRequests, String abortNoteOnMergeRequests, boolean addCiMessage,
-                             boolean addVoteOnMergeRequest, boolean acceptMergeRequestOnSuccess, BranchFilterType branchFilterType,
-                             String includeBranchesSpec, String excludeBranchesSpec, String targetBranchRegex) {
+                             boolean addNoteOnMergeRequest, boolean addCiMessage, boolean addVoteOnMergeRequest, boolean acceptMergeRequestOnSuccess,
+                             BranchFilterType branchFilterType, String includeBranchesSpec, String excludeBranchesSpec, String targetBranchRegex) {
         this.triggerOnPush = triggerOnPush;
         this.triggerOnMergeRequest = triggerOnMergeRequest;
         this.triggerOnNoteRequest = triggerOnNoteRequest;
@@ -103,10 +95,6 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
         this.ciSkip = ciSkip;
         this.setBuildDescription = setBuildDescription;
         this.addNoteOnMergeRequest = addNoteOnMergeRequest;
-        this.notesCustomize = notesCustomize;
-        this.successNoteOnMergeRequests = successNoteOnMergeRequests;
-        this.failureNoteOnMergeRequests = failureNoteOnMergeRequests;
-        this.abortNoteOnMergeRequests = abortNoteOnMergeRequests;
         this.addCiMessage = addCiMessage;
         this.addVoteOnMergeRequest = addVoteOnMergeRequest;
         this.branchFilterType = branchFilterType;
@@ -135,6 +123,9 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
                 if (trigger != null) {
                     if (trigger.addCiMessage) {
                         project.getPublishersList().add(new GitLabCommitStatusPublisher());
+                    }
+                    if (trigger.addNoteOnMergeRequest) {
+                        project.getPublishersList().add(new GitLabMessagePublisher(false, false, false, null, null, null));
                     }
                     if (trigger.branchFilterType == null) {
                         trigger.branchFilterType = trigger.branchFilterName;
@@ -175,22 +166,6 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
 
     public boolean getAddNoteOnMergeRequest() {
         return addNoteOnMergeRequest;
-    }
-
-    public boolean getNotesCustomize() {
-        return notesCustomize;
-    }
-
-    public String getSuccessNoteOnMergeRequests() {
-        return this.successNoteOnMergeRequests == null ? "" : this.successNoteOnMergeRequests;
-    }
-
-    public String getFailureNoteOnMergeRequests() {
-        return this.failureNoteOnMergeRequests == null ? "" : this.failureNoteOnMergeRequests;
-    }
-
-    public String getAbortNoteOnMergeRequests() {
-        return this.abortNoteOnMergeRequests == null ? "" : this.abortNoteOnMergeRequests;
     }
 
     public boolean getAddVoteOnMergeRequest() {
