@@ -60,6 +60,10 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
     private boolean ciSkip = true;
     private boolean setBuildDescription = true;
     private boolean addNoteOnMergeRequest = true;
+    private boolean notesCustomize = false;
+    private String successNoteOnMergeRequests;
+    private String failureNoteOnMergeRequests;
+    private String abortNoteOnMergeRequests;
     private boolean addCiMessage = false;
     private boolean addVoteOnMergeRequest = true;
     private transient boolean allowAllBranches = false;
@@ -77,7 +81,8 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
     @DataBoundConstructor
     @GeneratePojoBuilder(intoPackage = "*.builder.generated", withFactoryMethod = "*")
     public GitLabPushTrigger(boolean triggerOnPush, boolean triggerOnMergeRequest, TriggerOpenMergeRequest triggerOpenMergeRequestOnPush,
-                             boolean ciSkip, boolean setBuildDescription, boolean addNoteOnMergeRequest, boolean addCiMessage,
+                             boolean ciSkip, boolean setBuildDescription, boolean addNoteOnMergeRequest, boolean notesCustomize,
+                             String successNoteOnMergeRequests, String failureNoteOnMergeRequests, String abortNoteOnMergeRequests, boolean addCiMessage,
                              boolean addVoteOnMergeRequest, boolean acceptMergeRequestOnSuccess, BranchFilterType branchFilterType,
                              String includeBranchesSpec, String excludeBranchesSpec, String targetBranchRegex) {
         this.triggerOnPush = triggerOnPush;
@@ -86,6 +91,10 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
         this.ciSkip = ciSkip;
         this.setBuildDescription = setBuildDescription;
         this.addNoteOnMergeRequest = addNoteOnMergeRequest;
+        this.notesCustomize = notesCustomize;
+        this.successNoteOnMergeRequests = successNoteOnMergeRequests;
+        this.failureNoteOnMergeRequests = failureNoteOnMergeRequests;
+        this.abortNoteOnMergeRequests = abortNoteOnMergeRequests;
         this.addCiMessage = addCiMessage;
         this.addVoteOnMergeRequest = addVoteOnMergeRequest;
         this.branchFilterType = branchFilterType;
@@ -146,6 +155,22 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
 
     public boolean getAddNoteOnMergeRequest() {
         return addNoteOnMergeRequest;
+    }
+
+    public boolean getNotesCustomize() {
+        return notesCustomize;
+    }
+
+    public String getSuccessNoteOnMergeRequests() {
+        return this.successNoteOnMergeRequests == null ? "" : this.successNoteOnMergeRequests;
+    }
+
+    public String getFailureNoteOnMergeRequests() {
+        return this.failureNoteOnMergeRequests == null ? "" : this.failureNoteOnMergeRequests;
+    }
+
+    public String getAbortNoteOnMergeRequests() {
+        return this.abortNoteOnMergeRequests == null ? "" : this.abortNoteOnMergeRequests;
     }
 
     public boolean getAddVoteOnMergeRequest() {
