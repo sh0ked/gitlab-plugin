@@ -91,8 +91,9 @@ To enable this functionality, a user should be set up on GitLab, with GitLab 'De
 ### Freestyle and Pipeline jobs
 1. In the *Build Triggers* section:
     * Check the ``Build when a change is pushed to GitLab.``
-    * Use the check boxes to trigger builds on Push and/or Merge Request events
+    * Use the check boxes to trigger builds on Push and/or Merge Request events and/or Note Request(Comment in Merge Request)
     * Optionally enable building open merge requests again after a push to the source branch.
+    * If you check *Note Events* then you should set trigger phrase(exact phrase or Java Regular Expression) in Trigger Phrase field.
 2. Configure any other pre build, build or post build actions as necessary
 3. Click *Save* to preserve your changes in Jenkins.
 
@@ -114,7 +115,7 @@ To enable this functionality, a user should be set up on GitLab, with GitLab 'De
 ## Gitlab Configuration (>= 8.1)
 * In GitLab go to you primary repository's project *Settings*
     * Click on *Web Hooks*
-        * Add a Web Hook for *Merge Request Events* and *Push Events* to ``http://JENKINS_URL/project/PROJECT_NAME`` <br/>
+        * Add a Web Hook for *Merge Request Events*, *Push Events* or *Note Events* to ``http://JENKINS_URL/project/PROJECT_NAME`` <br/>
 
 If you plan to use forked repositories, you will need to enable the GitLab CI integration on **each fork**.
 * Go to the Settings page in each developer's fork
