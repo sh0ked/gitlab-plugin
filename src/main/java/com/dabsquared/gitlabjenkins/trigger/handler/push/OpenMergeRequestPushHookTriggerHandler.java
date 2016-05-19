@@ -37,7 +37,7 @@ class OpenMergeRequestPushHookTriggerHandler implements PushHookTriggerHandler {
     private final static Logger LOGGER = Logger.getLogger(OpenMergeRequestPushHookTriggerHandler.class.getName());
 
     @Override
-    public void handle(Job<?, ?> job, PushHook hook, boolean ciSkip, BranchFilter branchFilter) {
+    public void handle(Job<?, ?> job, PushHook hook, boolean ciSkip, boolean stopBuildWithSameBranch, BranchFilter branchFilter) {
         try {
             if (job instanceof AbstractProject<?, ?>) {
                 AbstractProject<?, ?> project = (AbstractProject<?, ?>) job;

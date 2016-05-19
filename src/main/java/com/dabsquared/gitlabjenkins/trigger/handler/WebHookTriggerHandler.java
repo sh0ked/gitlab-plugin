@@ -9,5 +9,5 @@ import hudson.model.Job;
  */
 public interface WebHookTriggerHandler<H extends WebHook> {
 
-    void handle(Job<?, ?> job, H hook, boolean ciSkip, BranchFilter branchFilter);
+    void handle(Job<?, ?> job, H hook, boolean ciSkip, boolean stopBuildWithSameBranch, BranchFilter branchFilter);
 }

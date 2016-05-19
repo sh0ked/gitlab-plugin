@@ -58,6 +58,7 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
     private boolean triggerOnMergeRequest = true;
     private final TriggerOpenMergeRequest triggerOpenMergeRequestOnPush;
     private boolean ciSkip = true;
+    private boolean stopBuildWithSameBranch = false;
     private boolean setBuildDescription = true;
     private boolean addNoteOnMergeRequest = true;
     private boolean addCiMessage = false;
@@ -77,13 +78,14 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
     @DataBoundConstructor
     @GeneratePojoBuilder(intoPackage = "*.builder.generated", withFactoryMethod = "*")
     public GitLabPushTrigger(boolean triggerOnPush, boolean triggerOnMergeRequest, TriggerOpenMergeRequest triggerOpenMergeRequestOnPush,
-                             boolean ciSkip, boolean setBuildDescription, boolean addNoteOnMergeRequest, boolean addCiMessage,
-                             boolean addVoteOnMergeRequest, boolean acceptMergeRequestOnSuccess, BranchFilterType branchFilterType,
+                             boolean ciSkip, boolean stopBuildWithSameBranch, boolean setBuildDescription, boolean addNoteOnMergeRequest,
+                             boolean addCiMessage, boolean addVoteOnMergeRequest, boolean acceptMergeRequestOnSuccess, BranchFilterType branchFilterType,
                              String includeBranchesSpec, String excludeBranchesSpec, String targetBranchRegex) {
         this.triggerOnPush = triggerOnPush;
         this.triggerOnMergeRequest = triggerOnMergeRequest;
         this.triggerOpenMergeRequestOnPush = triggerOpenMergeRequestOnPush;
         this.ciSkip = ciSkip;
+        this.stopBuildWithSameBranch = stopBuildWithSameBranch;
         this.setBuildDescription = setBuildDescription;
         this.addNoteOnMergeRequest = addNoteOnMergeRequest;
         this.addCiMessage = addCiMessage;
@@ -160,6 +162,10 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
         return ciSkip;
     }
 
+    public boolean getStopBuildWithSameBranch() {
+        return stopBuildWithSameBranch;
+    }
+
     public BranchFilterType getBranchFilterType() {
         return branchFilterType;
     }
@@ -178,12 +184,12 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> {
 
     // executes when the Trigger receives a push request
     public void onPost(final PushHook hook) {
-        pushHookTriggerHandler.handle(job, hook, ciSkip, branchFilter);
+        pushHookTriggerHandler.handle(job, hook, ciSkip, stopBuildWithSameBranch, branchFilter);
     }
 
     // executes when the Trigger receives a merge request
     public void onPost(final MergeRequestHook hook) {
-        mergeRequestHookTriggerHandler.handle(job, hook, ciSkip, branchFilter);
+        mergeRequestHookTriggerHandler.handle(job, hook, ciSkip, stopBuildWithSameBranch, branchFilter);
     }
 
     private void initializeTriggerHandler() {

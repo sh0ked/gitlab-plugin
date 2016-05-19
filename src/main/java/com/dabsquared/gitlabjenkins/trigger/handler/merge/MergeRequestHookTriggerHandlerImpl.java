@@ -34,9 +34,9 @@ class MergeRequestHookTriggerHandlerImpl extends AbstractWebHookTriggerHandler<M
     }
 
     @Override
-    public void handle(Job<?, ?> job, MergeRequestHook hook, boolean ciSkip, BranchFilter branchFilter) {
+    public void handle(Job<?, ?> job, MergeRequestHook hook, boolean ciSkip, boolean stopBuildWithSameBranch, BranchFilter branchFilter) {
         if (allowedStates.contains(hook.getObjectAttributes().getState()) && isLastCommitNotYetBuild(job, hook)) {
-            super.handle(job, hook, ciSkip, branchFilter);
+            super.handle(job, hook, ciSkip, stopBuildWithSameBranch, branchFilter);
         }
     }
 

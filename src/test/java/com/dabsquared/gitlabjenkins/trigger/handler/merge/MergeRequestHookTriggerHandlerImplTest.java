@@ -66,7 +66,7 @@ public class MergeRequestHookTriggerHandlerImplTest {
         project.setQuietPeriod(0);
         mergeRequestHookTriggerHandler.handle(project, mergeRequestHook()
                 .withObjectAttributes(objectAttributes().withDescription("[ci-skip]").build())
-                .build(), true, BranchFilterFactory.newBranchFilter(branchFilterConfig().build(BranchFilterType.All)));
+                .build(), true, false, BranchFilterFactory.newBranchFilter(branchFilterConfig().build(BranchFilterType.All)));
 
         buildTriggered.block(10000);
         assertThat(buildTriggered.isSignaled(), is(false));
@@ -121,7 +121,7 @@ public class MergeRequestHookTriggerHandlerImplTest {
                                 .withHttpUrl("https://gitlab.org/test.git")
                                 .build())
                         .build())
-                .build(), true, BranchFilterFactory.newBranchFilter(branchFilterConfig().build(BranchFilterType.All)));
+                .build(), true, false, BranchFilterFactory.newBranchFilter(branchFilterConfig().build(BranchFilterType.All)));
 
         buildTriggered.block(10000);
         assertThat(buildTriggered.isSignaled(), is(true));

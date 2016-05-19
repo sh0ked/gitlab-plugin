@@ -9,7 +9,7 @@ import hudson.model.Job;
  */
 class NopPushHookTriggerHandler implements PushHookTriggerHandler {
     @Override
-    public void handle(Job<?, ?> job, PushHook hook, boolean ciSkip, BranchFilter branchFilter) {
+    public void handle(Job<?, ?> job, PushHook hook, boolean ciSkip, boolean stopBuildWithSameBranch, BranchFilter branchFilter) {
         // nothing to do
     }
 }
