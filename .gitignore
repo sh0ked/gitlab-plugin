@@ -3,11 +3,11 @@
 target/
 pom.xml.tag
 pom.xml.releaseBackup
+pom.xml.versionsBackup
 pom.xml.next
 release.properties
 work
 .classpath
 .project
 .settings
-/bin/
-/bin
+.DS_Store
